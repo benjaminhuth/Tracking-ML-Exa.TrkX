@@ -25,6 +25,7 @@ class FilterBase(LightningModule):
         Initialise the Lightning Module that can scan over different filter training regimes
         """
         self.save_hyperparameters(hparams)
+        self.num_workers = hparams["num_workers"] if "num_workers" in hparams else 1
 
     def setup(self, stage):
         # Handle any subset of [train, val, test] data split, assuming that ordering
@@ -48,19 +49,19 @@ class FilterBase(LightningModule):
 
     def train_dataloader(self):
         if self.trainset is not None:
-            return DataLoader(self.trainset, batch_size=1, num_workers=1)
+            return DataLoader(self.trainset, batch_size=1, num_workers=self.num_workers)
         else:
             return None
 
     def val_dataloader(self):
         if self.valset is not None:
-            return DataLoader(self.valset, batch_size=1, num_workers=1)
+            return DataLoader(self.valset, batch_size=1, num_workers=self.num_workers)
         else:
             return None
 
     def test_dataloader(self):
         if self.testset is not None:
-            return DataLoader(self.testset, batch_size=1, num_workers=1)
+            return DataLoader(self.testset, batch_size=1, num_workers=self.num_workers)
         else:
             return None
 

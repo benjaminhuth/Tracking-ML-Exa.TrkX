@@ -19,7 +19,7 @@ import pytorch_lightning as pl
 from pytorch_lightning import LightningModule
 import torch
 from torch.nn import Linear
-from torch_geometric.data import DataLoader
+from torch_geometric.loader import DataLoader
 from torch_cluster import radius_graph
 import numpy as np
 
@@ -36,25 +36,26 @@ class EmbeddingBase(LightningModule):
         Initialise the Lightning Module that can scan over different embedding training regimes
         """
         self.save_hyperparameters(hparams)
+        self.num_workers = hparams["num_workers"] if "num_workers" in hparams else 1
 
     def setup(self, stage):
         self.trainset, self.valset, self.testset = split_datasets(**self.hparams)
 
     def train_dataloader(self):
         if len(self.trainset) > 0:
-            return DataLoader(self.trainset, batch_size=1, num_workers=1)
+            return DataLoader(self.trainset, batch_size=1, num_workers=self.num_workers)
         else:
             return None
 
     def val_dataloader(self):
         if len(self.valset) > 0:
-            return DataLoader(self.valset, batch_size=1, num_workers=1)
+            return DataLoader(self.valset, batch_size=1, num_workers=self.num_workers)
         else:
             return None
 
     def test_dataloader(self):
         if len(self.testset):
-            return DataLoader(self.testset, batch_size=1, num_workers=1)
+            return DataLoader(self.testset, batch_size=1, num_workers=self.num_workers)
         else:
             return None
 
