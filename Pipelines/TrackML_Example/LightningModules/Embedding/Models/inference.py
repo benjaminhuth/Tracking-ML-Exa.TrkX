@@ -120,16 +120,18 @@ class EmbeddingTelemetry(Callback):
         return eff, pur, r_cuts
 
     def calculate_metrics(self):
-
-        centers, ratio_hist = self.get_pt_metrics()
-
         eff, pur, r_cuts = self.get_eff_pur_metrics()
 
-        return {
-            "pt_plot": {"centers": centers, "ratio_hist": ratio_hist},
+        metrics = {
             "eff_plot": {"eff": eff, "r_cuts": r_cuts},
             "pur_plot": {"pur": pur, "r_cuts": r_cuts},
         }
+
+        if len(self.pt_true_pos) > 0:
+            centers, ratio_hist = self.get_pt_metrics()
+            metrics["pt_plot"] = {"centers": centers, "ratio_hist": ratio_hist}
+
+        return metrics
 
     def make_plot(self, x_val, y_val, x_lab, y_lab, title):
 
@@ -146,14 +148,6 @@ class EmbeddingTelemetry(Callback):
         return fig, axs
 
     def plot_metrics(self, metrics):
-
-        centers, ratio_hist = (
-            metrics["pt_plot"]["centers"],
-            metrics["pt_plot"]["ratio_hist"],
-        )
-        pt_fig, pt_axs = self.make_plot(
-            centers, ratio_hist, "pT (GeV)", "Efficiency", "Metric Learning Efficiency"
-        )
 
         eff_fig, eff_axs = self.make_plot(
             metrics["eff_plot"]["r_cuts"],
@@ -177,12 +171,26 @@ class EmbeddingTelemetry(Callback):
             "ROC Curve",
         )
 
-        return {
-            "pt_plot": [pt_fig, pt_axs],
+        plots = {
             "eff_plot": [eff_fig, eff_axs],
             "pur_plot": [pur_fig, pur_axs],
             "roc_plot": [roc_fig, roc_axs],
         }
+
+        if "pt_plot" in metrics:
+            centers, ratio_hist = (
+                metrics["pt_plot"]["centers"],
+                metrics["pt_plot"]["ratio_hist"],
+            )
+
+            pt_fig, pt_axs = self.make_plot(
+                centers, ratio_hist, "pT (GeV)", "Efficiency", "Metric Learning Efficiency"
+            )
+
+            plots["pt_plot"] = [pt_fig, pt_axs]
+
+
+        return plots
 
     def save_metrics(self, metrics_plots, output_dir):
 

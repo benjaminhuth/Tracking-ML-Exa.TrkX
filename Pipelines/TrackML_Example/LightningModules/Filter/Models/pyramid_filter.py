@@ -27,7 +27,9 @@ class PyramidFilter(FilterBaseBalanced):
 
         # Construct the MLP architecture
         self.input_layer = Linear(
-            hparams["in_channels"] * 2 + hparams["emb_channels"] * 2, hparams["hidden"]
+            (hparams["spatial_channels"] + hparams["cell_channels"]) * 2
+            + hparams["emb_channels"] * 2,
+            hparams["hidden"],
         )
         layers = [
             Linear(hparams["hidden"] // (2**i), hparams["hidden"] // (2 ** (i + 1)))
@@ -38,8 +40,6 @@ class PyramidFilter(FilterBaseBalanced):
             hparams["hidden"] // (2 ** (hparams["nb_layer"] - 1)), 1
         )
         self.act = nn.Tanh()
-        batch_norms = [torch.nn.BatchNorm1d(l.out_features) for l in self.layers]
-        self.batch_norms = nn.ModuleList(batch_norms)
 
     def forward(self, x, e, emb=None):
         if emb is not None:
@@ -48,12 +48,10 @@ class PyramidFilter(FilterBaseBalanced):
             )
         else:
             x = self.input_layer(torch.cat([x[e[0]], x[e[1]]], dim=-1))
-        for b, l in zip(self.batch_norms, self.layers):
+        for l in self.layers:
             x = l(x)
             x = self.act(x)
             if self.hparams["layernorm"]:
                 x = F.layer_norm(x, (l.out_features,))  # Option of LayerNorm
-            if self.hparams["batchnorm"]:
-                x = b(x)  # Option of BatchNorm
         x = self.output_layer(x)
         return x
