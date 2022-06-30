@@ -24,7 +24,7 @@ class SegmentBase(LightningDataModule):
         )
 
         self.n_tasks = (
-            1 if "n_tasks" not in self.hparams["n_tasks"] else self.hparams["n_tasks"]
+            1 if "n_tasks" not in self.hparams else self.hparams["n_tasks"]
         )
         self.task = 0 if "task" not in self.hparams else self.hparams["task"]
         self.n_workers = (

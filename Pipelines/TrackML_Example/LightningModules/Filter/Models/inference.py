@@ -263,6 +263,8 @@ class FilterBuilder(Callback):
         ) as pickle_file:
             torch.save(batch, pickle_file)
 
+
+
         logging.info("Saved event {}".format(batch.event_file[-4:]))
 
 

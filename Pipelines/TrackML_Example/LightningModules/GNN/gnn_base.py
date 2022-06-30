@@ -153,14 +153,14 @@ class GNNBase(LightningModule):
 
         auc = roc_auc_score(truth.bool().cpu().detach(), preds.cpu().detach())
 
-        current_lr = self.optimizers().param_groups[0]["lr"]
+        #current_lr = self.optimizers().param_groups[0]["lr"]
         self.log_dict(
             {
                 "val_loss": loss,
                 "auc": auc,
                 "eff": eff,
                 "pur": pur,
-                "current_lr": current_lr,
+                #"current_lr": current_lr,
             }
         )
 
@@ -209,17 +209,17 @@ class GNNBase(LightningModule):
 
     def test_step(self, batch, batch_idx):
 
-        outputs = self.shared_evaluation(batch, batch_idx, log=False)
+        outputs = self.shared_evaluation(batch, batch_idx, log=True)
 
         return outputs
 
     def test_step_end(self, output_results):
-
-        print("Step:", output_results)
+        pass
+        #print("Step:", output_results)
 
     def test_epoch_end(self, outputs):
-
-        print("Epoch:", outputs)
+        pass
+        #print("Epoch:", outputs)
 
     def optimizer_step(
         self,

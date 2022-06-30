@@ -55,7 +55,7 @@ class EmbeddingTelemetry(Callback):
         true_positives = outputs["preds"][:, outputs["truth"]]
         true = outputs["truth_graph"]
 
-        if "pt" in batch.__dict__.keys():
+        if "pt" in batch:
             pts = batch.pt
             self.pt_true_pos.append(pts[true_positives].cpu())
             self.pt_true.append(pts[true].cpu())
@@ -106,14 +106,14 @@ class EmbeddingTelemetry(Callback):
 
         r_cuts = np.arange(0.01, self.hparams["r_test"], 0.01)
 
-        print(r_cuts)
+        #print(r_cuts)
 
         positives = np.array([(self.distances < r_cut**2).sum() for r_cut in r_cuts])
         true_positives = np.array(
             [self.truth[self.distances < r_cut**2].sum() for r_cut in r_cuts]
         )
 
-        print(positives, true_positives)
+        #print(positives, true_positives)
         eff = true_positives / self.truth_graph.shape[1]
         pur = true_positives / positives
 
@@ -134,7 +134,7 @@ class EmbeddingTelemetry(Callback):
     def make_plot(self, x_val, y_val, x_lab, y_lab, title):
 
         # Update this to dynamically adapt to number of metrics
-        fig, axs = plt.subplots(nrows=1, ncols=1, figsize=(20, 20))
+        fig, axs = plt.subplots(nrows=1, ncols=1, figsize=(10, 10))
         axs = axs.flatten() if type(axs) is list else [axs]
 
         axs[0].plot(x_val, y_val)

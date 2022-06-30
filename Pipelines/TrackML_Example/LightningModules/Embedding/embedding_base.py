@@ -38,7 +38,8 @@ class EmbeddingBase(LightningModule):
         self.save_hyperparameters(hparams)
 
     def setup(self, stage):
-        self.trainset, self.valset, self.testset = split_datasets(**self.hparams)
+        if "trainset" not in self.__dict__.keys():
+            self.trainset, self.valset, self.testset = split_datasets(**self.hparams)
 
     def train_dataloader(self):
         if len(self.trainset) > 0:
@@ -109,6 +110,9 @@ class EmbeddingBase(LightningModule):
             : self.hparams["points_per_batch"]
         ]
         query = spatial[query_indices]
+
+        assert len(query) > 0
+        assert len(query_indices) > 0
 
         return query_indices, query
 
@@ -301,9 +305,14 @@ class EmbeddingBase(LightningModule):
         pur = torch.tensor(cluster_true_positive / cluster_positive)
 
         if log:
-            current_lr = self.optimizers().param_groups[0]["lr"]
+            #current_lr = self.optimizers().param_groups[0]["lr"]
             self.log_dict(
-                {"val_loss": loss, "eff": eff, "pur": pur, "current_lr": current_lr}
+                {
+                    "val_loss": loss,
+                    "eff": eff,
+                    "pur": pur,
+                    #"current_lr": current_lr
+                }
             )
         logging.info("Efficiency: {}".format(eff))
         logging.info("Purity: {}".format(pur))
@@ -333,7 +342,7 @@ class EmbeddingBase(LightningModule):
         Step to evaluate the model's performance
         """
         outputs = self.shared_evaluation(
-            batch, batch_idx, self.hparams["r_test"], 1000, log=False
+            batch, batch_idx, self.hparams["r_test"], 1000, log=True
         )
 
         return outputs

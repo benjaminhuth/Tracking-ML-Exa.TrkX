@@ -15,7 +15,7 @@ import wandb
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # Local imports
-from .utils import graph_intersection, load_dataset
+from .utils import graph_intersection, load_dataset, LargeDataset
 
 
 class FilterBase(LightningModule):
@@ -34,17 +34,28 @@ class FilterBase(LightningModule):
             for datatype in self.hparams["datatype_names"]
         ]
         if "trainset" not in self.__dict__.keys():
-            self.trainset, self.valset, self.testset = [
-                load_dataset(
-                    input_dir,
-                    self.hparams["datatype_split"][i],
-                    self.hparams["pt_background_min"],
-                    self.hparams["pt_signal_min"],
-                    self.hparams["true_edges"],
-                    self.hparams["noise"],
-                )
-                for i, input_dir in enumerate(input_dirs)
-            ]
+            if "large_dataset" in self.hparams and self.hparams["large_dataset"]:
+                self.trainset, self.valset, self.testset = [
+                    LargeDataset(
+                        input_dir,
+                        os.path.join(input_dir, "processed"),
+                        self.hparams,
+                        self.hparams["datatype_split"][i],
+                    ) if input_dir is not None else None
+                    for i, input_dir in enumerate(input_dirs) 
+                ]
+            else:
+                self.trainset, self.valset, self.testset = [
+                    load_dataset(
+                        input_dir,
+                        self.hparams["datatype_split"][i],
+                        self.hparams["pt_background_min"],
+                        self.hparams["pt_signal_min"],
+                        self.hparams["true_edges"],
+                        self.hparams["noise"],
+                    )
+                    for i, input_dir in enumerate(input_dirs)
+                ]
 
     def train_dataloader(self):
         if self.trainset is not None:
@@ -229,7 +240,7 @@ class FilterBase(LightningModule):
         """
         Step to evaluate the model's performance
         """
-        outputs = self.shared_evaluation(batch, batch_idx, log=False)
+        outputs = self.shared_evaluation(batch, batch_idx, log=True)
 
         return outputs
 
@@ -295,7 +306,7 @@ class FilterBaseBalanced(FilterBase):
                         emb,
                     ).squeeze()
                 else:
-                    self(batch.x, batch.edge_index[:, subset_ind], emb).squeeze()
+                    output = self(batch.x, batch.edge_index[:, subset_ind], emb).squeeze()
 
                 cut = torch.sigmoid(output) > self.hparams["filter_cut"]
                 cut_list.append(cut)
@@ -328,7 +339,7 @@ class FilterBaseBalanced(FilterBase):
                 emb,
             ).squeeze()
         else:
-            self(batch.x, batch.edge_index[:, combined_indices], emb).squeeze()
+            output = self(batch.x, batch.edge_index[:, combined_indices], emb).squeeze()
 
         if "weighting" in self.hparams["regime"]:
             manual_weights = batch.weights[combined_indices]
@@ -364,7 +375,7 @@ class FilterBaseBalanced(FilterBase):
 
     def test_step(self, batch, batch_idx):
 
-        result = self.shared_evaluation(batch, batch_idx, log=False)
+        result = self.shared_evaluation(batch, batch_idx, log=True)
 
         return result
 
@@ -429,14 +440,14 @@ class FilterBaseBalanced(FilterBase):
         edge_true_positive = (true_y.bool() & cut_list).sum().float()
 
         if log:
-            current_lr = self.optimizers().param_groups[0]["lr"]
+            #current_lr = self.optimizers().param_groups[0]["lr"]
 
             self.log_dict(
                 {
                     "eff": torch.tensor(edge_true_positive / edge_true),
                     "pur": torch.tensor(edge_true_positive / edge_positive),
                     "val_loss": val_loss,
-                    "current_lr": current_lr,
+                    #"current_lr": current_lr,
                 }
             )
         return {"loss": val_loss, "preds": score_list, "truth": true_y}

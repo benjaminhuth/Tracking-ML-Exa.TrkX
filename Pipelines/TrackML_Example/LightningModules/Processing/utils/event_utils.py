@@ -291,7 +291,8 @@ def prepare_event(
     **kwargs
 ):
 
-    try:
+    if True:
+#    try:
         evtid = int(event_file[-9:])
         filename = os.path.join(output_dir, str(evtid))
 
@@ -344,5 +345,5 @@ def prepare_event(
 
         else:
             logging.info("{} already exists".format(evtid))
-    except Exception as inst:
-        print("File:", event_file, "had exception", inst)
+#    except Exception as inst:
+#        print("File:", event_file, "had exception", inst)

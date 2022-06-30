@@ -26,17 +26,18 @@ def label_graph(
 
     """
 
-    try:
-
+    #try:
+    if True:
         output_file = os.path.join(output_dir, os.path.split(input_file)[-1])
 
+        overwrite=True
         if not os.path.exists(output_file) or overwrite:
 
             logging.info("Preparing event {}".format(output_file))
             graph = torch.load(input_file, map_location="cpu")
 
             # apply cut
-            passing_edges = graph.edge_index[:, graph.scores > edge_cut]
+            passing_edges = graph.edge_index[:, graph.scores[:graph.edge_index.shape[1]] > edge_cut]
 
             # get connected components
             sparse_edges = sp.coo_matrix(
@@ -49,10 +50,10 @@ def label_graph(
             graph.labels = connected_components
 
             with open(output_file, "wb") as pickle_file:
-                torch.save(data, pickle_file)
+                torch.save(graph, pickle_file)
 
         else:
             logging.info("{} already exists".format(output_file))
 
-    except Exception as inst:
-        print("File:", input_file, "had exception", inst)
+    #except Exception as inst:
+        #print("File:", input_file, "had exception", inst)
