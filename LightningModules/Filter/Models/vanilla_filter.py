@@ -48,7 +48,14 @@ class VanillaFilter(LargeFilterBaseBalanced):
                 torch.cat([x[e[0]], emb[e[0]], x[e[1]], emb[e[1]]], dim=-1)
             )
         else:
-            x = self.input_layer(torch.cat([x[e[0]], x[e[1]]], dim=-1))
+            #x = self.input_layer(torch.cat([x[e[0]], x[e[1]]], dim=-1))
+            # Torch script conversion failed with []-operator
+            x = self.input_layer(torch.cat(
+                [
+                    torch.index_select(x, 0, torch.select(e, 0, 0)),
+                    torch.index_select(x, 0, torch.select(e, 0, 1)),
+                ], dim=-1))
+
         for l in self.layers:
             x = l(x)
             x = self.act(x)
