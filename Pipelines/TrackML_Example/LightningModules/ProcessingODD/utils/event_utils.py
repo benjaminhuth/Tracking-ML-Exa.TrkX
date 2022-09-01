@@ -156,12 +156,13 @@ def build_event(
     layerwise=True,
     noise=False,
     detector=None,
+    digitized_hits=False,
     cell_information=False,
 ):
     # Get true edge list using the ordering by R' = distance from production vertex of each particle
     # NOTE Changed for ODD
     particles = pd.read_csv(event_file + "-particles.csv")
-    hits, truth = load_hits_and_truth_as_trackml(event_file, detector, mask_simhits=cell_information)
+    hits, truth = load_hits_and_truth_as_trackml(event_file, detector, mask_simhits=False, use_measurements_as_hits=digitized_hits)
 
     hits = select_hits(hits, truth, particles, endcaps=endcaps, noise=noise).assign(
         evtid=int(event_file[-9:])
