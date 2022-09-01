@@ -2,14 +2,6 @@ import sys
 
 import torch.nn as nn
 from torch.nn import Linear
-from torch.nn.init import (
-    uniform_,
-    normal_,
-    xavier_uniform_,
-    xavier_normal_,
-    kaiming_uniform_,
-    kaiming_normal_,
-)
 import torch
 from torch_scatter import scatter_add, scatter_mean, scatter_max
 from torch.utils.checkpoint import checkpoint

@@ -6,8 +6,6 @@ from torch.utils.data import random_split
 from torch import nn
 import scipy as sp
 import numpy as np
-import pandas as pd
-import trackml.dataset
 
 from alive_progress import alive_bar
 
@@ -44,6 +42,7 @@ def load_dataset(
     primary_only,
     true_edges,
     noise,
+    **kwargs
 ):
     if input_dir is not None:
         all_events = os.listdir(input_dir)
@@ -55,8 +54,8 @@ def load_dataset(
             for event in all_events[:num]:
                 try:
                     loaded_event = torch.load(event, map_location=torch.device("cpu"))
+                    loaded_event.event_file = event
                     loaded_events.append(loaded_event)
-                    logging.info("Loaded event: {}".format(loaded_event.event_file))
                 except:
                     logging.info("Corrupted event file: {}".format(event))
 
@@ -263,7 +262,7 @@ def build_edges(
 
         if device == "cuda":
             res = faiss.StandardGpuResources()
-            Dsq, I = faiss.knn_gpu(res, database, query, k_max)
+            Dsq, I = faiss.knn_gpu(res=res, xq=query, xb=database, k=k_max)
         elif device == "cpu":
             index = faiss.IndexFlatL2(database.shape[1])
             index.add(database)
@@ -292,7 +291,7 @@ def build_knn(spatial, k):
 
     if device == "cuda":
         res = faiss.StandardGpuResources()
-        _, I = faiss.knn_gpu(res, spatial, spatial, k_max)
+        _, I = faiss.knn_gpu(res=res, xq=spatial, xb=spatial, k=k_max)
     elif device == "cpu":
         index = faiss.IndexFlatL2(spatial.shape[1])
         index.add(spatial)

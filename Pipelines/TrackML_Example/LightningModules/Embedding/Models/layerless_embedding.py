@@ -11,7 +11,7 @@ import torch.nn as nn
 from torch_cluster import radius_graph
 import torch.nn.functional as F
 import torch
-from torch_geometric.data import DataLoader
+from torch_geometric.loader import DataLoader
 
 # Local imports
 from ..utils import graph_intersection, make_mlp
@@ -24,10 +24,7 @@ class LayerlessEmbedding(EmbeddingBase):
         Initialise the Lightning Module that can scan over different embedding training regimes
         """
         # Construct the MLP architecture
-        if "ci" in hparams["regime"]:
-            in_channels = hparams["spatial_channels"] + hparams["cell_channels"]
-        else:
-            in_channels = hparams["spatial_channels"]
+        in_channels = hparams["spatial_channels"] + hparams["cell_channels"]
 
         self.network = make_mlp(
             in_channels,

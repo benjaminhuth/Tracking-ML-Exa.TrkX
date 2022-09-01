@@ -61,7 +61,7 @@ class HeteroGNNBase(LightningModule):
     def train_dataloader(self):
         if self.trainset is not None:
             return DataLoader(
-                self.trainset, batch_size=1, num_workers=4
+                self.trainset, batch_size=1, num_workers=2
             )  # , pin_memory=True, persistent_workers=True)
         else:
             return None
@@ -231,13 +231,22 @@ class HeteroGNNBase(LightningModule):
         
         output = self(batch.x.float(), edge_sample, batch.volume_id).squeeze()
 
-        loss = F.binary_cross_entropy_with_logits(
-            output, truth_sample.float().squeeze(), pos_weight=weight
-        )
+        if self.hparams["mask_background"]:
+            y_subset = truth_sample | ~batch.y_pid[sample_indices].bool()
+            subset_output, subset_truth_sample = output[y_subset], truth_sample[y_subset]
+            loss = F.binary_cross_entropy_with_logits(
+                subset_output, subset_truth_sample.float().squeeze(), pos_weight=weight
+            )            
+        else:
+            loss = F.binary_cross_entropy_with_logits(
+                output, truth_sample.float().squeeze(), pos_weight=weight
+            )
 
-        preds = self.log_metrics(output, sample_indices, batch, loss, log)
-
-        return {"loss": loss, "preds": preds, "score": torch.sigmoid(output)}
+        try:
+            preds = self.log_metrics(output, sample_indices, batch, loss, log)
+            return {"loss": loss, "preds": preds, "score": torch.sigmoid(output)}
+        except:
+            return {"loss": loss, "score": torch.sigmoid(output)}
 
     def validation_step(self, batch, batch_idx):
 

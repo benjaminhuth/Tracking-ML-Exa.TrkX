@@ -19,7 +19,7 @@ import pytorch_lightning as pl
 from pytorch_lightning import LightningModule
 import torch
 from torch.nn import Linear
-from torch_geometric.data import DataLoader
+from torch_geometric.loader import DataLoader
 from torch_cluster import radius_graph
 import numpy as np
 
@@ -43,19 +43,19 @@ class EmbeddingBase(LightningModule):
 
     def train_dataloader(self):
         if len(self.trainset) > 0:
-            return DataLoader(self.trainset, batch_size=1, num_workers=1)
+            return DataLoader(self.trainset, batch_size=1, num_workers=16)
         else:
             return None
 
     def val_dataloader(self):
         if len(self.valset) > 0:
-            return DataLoader(self.valset, batch_size=1, num_workers=1)
+            return DataLoader(self.valset, batch_size=1, num_workers=16)
         else:
             return None
 
     def test_dataloader(self):
         if len(self.testset):
-            return DataLoader(self.testset, batch_size=1, num_workers=1)
+            return DataLoader(self.testset, batch_size=1, num_workers=16)
         else:
             return None
 
@@ -84,7 +84,7 @@ class EmbeddingBase(LightningModule):
 
     def get_input_data(self, batch):
 
-        if "ci" in self.hparams["regime"]:
+        if self.hparams["cell_channels"] > 0:
             input_data = torch.cat(
                 [batch.cell_data[:, : self.hparams["cell_channels"]], batch.x], axis=-1
             )
@@ -247,7 +247,7 @@ class EmbeddingBase(LightningModule):
         hinge, d = self.get_hinge_distance(spatial, e_spatial, y_cluster)
 
         # Give negative examples a weight of 1 (note that there may still be TRUE examples that are weightless)
-        new_weights[y_cluster == 0] = 1
+        new_weights[hinge == -1] = 1
 
         negative_loss = torch.nn.functional.hinge_embedding_loss(
             d[hinge == -1],
@@ -265,11 +265,11 @@ class EmbeddingBase(LightningModule):
 
         loss = negative_loss + self.hparams["weight"] * positive_loss
 
-        self.log("train_loss", loss)
+        self.log("train_loss", loss, on_epoch=True, on_step=False)
 
         return loss
 
-    def shared_evaluation(self, batch, batch_idx, knn_radius, knn_num, log=False):
+    def shared_evaluation(self, batch, batch_idx, knn_radius, knn_num, log=False, verbose=False):
 
         input_data = self.get_input_data(batch)
         spatial = self(input_data)
@@ -284,14 +284,10 @@ class EmbeddingBase(LightningModule):
         )
 
         e_spatial, y_cluster = self.get_truth(batch, e_spatial, e_bidir)
-        new_weights = y_cluster.to(self.device) * self.hparams["weight"]
 
         hinge, d = self.get_hinge_distance(
             spatial, e_spatial.to(self.device), y_cluster
         )
-
-        new_weights[y_cluster == 0] = 1
-        d = d  # * new_weights THIS IS BETTER TO NOT INCLUDE
 
         loss = torch.nn.functional.hinge_embedding_loss(
             d, hinge, margin=self.hparams["margin"]**2, reduction="mean"
@@ -301,8 +297,8 @@ class EmbeddingBase(LightningModule):
         cluster_true_positive = y_cluster.sum()
         cluster_positive = len(e_spatial[0])
 
-        eff = torch.tensor(cluster_true_positive / cluster_true)
-        pur = torch.tensor(cluster_true_positive / cluster_positive)
+        eff = cluster_true_positive / cluster_true
+        pur = cluster_true_positive / cluster_positive
 
         if log:
             #current_lr = self.optimizers().param_groups[0]["lr"]
@@ -313,10 +309,14 @@ class EmbeddingBase(LightningModule):
                     "pur": pur,
                     #"current_lr": current_lr
                 }
+                on_epoch=True,
+                on_step=False
             )
-        logging.info("Efficiency: {}".format(eff))
-        logging.info("Purity: {}".format(pur))
-        logging.info(batch.event_file)
+
+        if verbose:
+            logging.info("Efficiency: {}".format(eff))
+            logging.info("Purity: {}".format(pur))
+            logging.info(batch.event_file)
 
         return {
             "loss": loss,
@@ -324,6 +324,8 @@ class EmbeddingBase(LightningModule):
             "preds": e_spatial,
             "truth": y_cluster,
             "truth_graph": e_bidir,
+            'eff': eff,
+            'pur': pur
         }
 
     def validation_step(self, batch, batch_idx):

@@ -234,13 +234,13 @@ def run_eta_performance(checkpoint_path, model_type, dataset_type, num_events, s
     return eff_ax, signal_pur_ax, bkg_pur_ax
 
 
-def run_pt_performance(checkpoint_path, model_type, dataset_type, num_events, score_cut, common_axes = None):
+def run_pt_performance(checkpoint_path, model_type, dataset_type, num_events, score_cut, common_axes = None, signal_true_label="pid_signal", bkg_true_label="y_pid"):
     """
     Get performance of the model on the pt distribution
     """
     model, _ = load_model(checkpoint_path, model_type)
     results = inference(model, dataset_type, num_events)
-    get_topline_stats(results, score_cut)
+    get_topline_stats(results, score_cut, signal_true_label, bkg_true_label)
     av_pt_pred, av_pt_signal_true, av_pt_signal_true_pos, av_pt_bkg_true_pos = build_edge_pt_list(results)
     eff_ax = plot_metrics(av_pt_pred, av_pt_signal_true, av_pt_signal_true_pos, av_pt_bkg_true_pos, num_bins=20, bounds=(1000, 100000), common_axes = common_axes, x_label="$p_{T} (MeV)$", y_labels=["Efficiency"], log_x=True)
 
@@ -268,6 +268,8 @@ def make_2d_ratio(counts_numerator, counts_denominator, eta_bins, r_bins, label=
     cbar = fig.colorbar(im, ax=ax)
     cbar.set_label(label)
     ax.grid(True)
+    
+    return ratio
 
 def plot_eta_r_metrics(av_eta_pred, av_eta_signal_true, av_eta_signal_true_pos, av_eta_bkg_true_pos, av_r_pred, av_r_signal_true, av_r_signal_true_pos, av_r_bkg_true_pos, vmin=[None, None, None], vmax=[None, None, None]):
 

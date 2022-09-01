@@ -34,8 +34,6 @@ def get_cell_information(
 ):
 
     event_file = data.event_file
-    evtid = event_file[-4:]
-
     angles = get_one_event(event_file, detector_orig, detector_proc)
     logging.info("Angles: {}".format(angles))
     hid = pd.DataFrame(data.hid.numpy(), columns=["hit_id"])
@@ -113,7 +111,7 @@ def get_modulewise_edges(hits):
     return true_edges
 
 
-def select_hits(hits, truth, particles, endcaps=False, noise=False):
+def select_hits(hits, truth, particles, endcaps=False, noise=False, min_pt=None):
     # Barrel volume and layer ids
     if endcaps:
         vlids = [
@@ -197,6 +195,9 @@ def select_hits(hits, truth, particles, endcaps=False, noise=False):
 
     truth = truth.assign(pt=np.sqrt(truth.tpx**2 + truth.tpy**2))
 
+    if min_pt:
+        truth = truth[truth.pt > min_pt]
+
     # Calculate derived hits variables
     r = np.sqrt(hits.x**2 + hits.y**2)
     phi = np.arctan2(hits.y, hits.x)
@@ -213,13 +214,14 @@ def build_event(
     modulewise=True,
     layerwise=True,
     noise=False,
+    min_pt=None,
     detector=None,
 ):
     # Get true edge list using the ordering by R' = distance from production vertex of each particle
     hits, particles, truth = trackml.dataset.load_event(
         event_file, parts=["hits", "particles", "truth"]
     )
-    hits = select_hits(hits, truth, particles, endcaps=endcaps, noise=noise).assign(
+    hits = select_hits(hits, truth, particles, endcaps=endcaps, noise=noise, min_pt=min_pt).assign(
         evtid=int(event_file[-9:])
     )
     
@@ -265,12 +267,12 @@ def build_event(
     return (
         hits[["r", "phi", "z"]].to_numpy() / feature_scale,
         hits.particle_id.to_numpy(),
-        layer_id,
         module_id,
         modulewise_true_edges,
         layerwise_true_edges,
         hits["hit_id"].to_numpy(),
         hits.pt.to_numpy(),
+        hits.weight.to_numpy(),
         edge_weight_norm,
     )
 
@@ -280,12 +282,12 @@ def prepare_event(
     detector_orig,
     detector_proc,
     cell_features,
-    progressbar=None,
     output_dir=None,
     endcaps=False,
     modulewise=True,
     layerwise=True,
     noise=False,
+    min_pt=None,
     cell_information=True,
     overwrite=False,
     **kwargs
@@ -303,13 +305,13 @@ def prepare_event(
             (
                 X,
                 pid,
-                layer_id,
                 module_id,
                 modulewise_true_edges,
                 layerwise_true_edges,
                 hid,
                 pt,
-                weights,
+                hit_weights,
+                edge_weights
             ) = build_event(
                 event_file,
                 feature_scale,
@@ -317,6 +319,7 @@ def prepare_event(
                 modulewise=modulewise,
                 layerwise=layerwise,
                 noise=noise,
+                min_pt=min_pt,
                 detector=detector_orig
             )
 
@@ -327,7 +330,8 @@ def prepare_event(
                 event_file=event_file,
                 hid=torch.from_numpy(hid),
                 pt=torch.from_numpy(pt),
-                weights=torch.from_numpy(weights),
+                hit_weights=torch.from_numpy(hit_weights),
+                edge_weights=torch.from_numpy(edge_weights),
             )
             if modulewise_true_edges is not None:
                 data.modulewise_true_edges = torch.from_numpy(modulewise_true_edges)
