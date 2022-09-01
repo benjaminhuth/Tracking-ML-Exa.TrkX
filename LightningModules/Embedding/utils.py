@@ -1,6 +1,7 @@
 import os
 import logging
 import random
+from xml.etree.ElementInclude import include
 
 import torch
 from torch.utils.data import random_split
@@ -25,6 +26,8 @@ try:
     FRNN_AVAILABLE = True
 except ImportError:
     FRNN_AVAILABLE = False
+
+logging.info(f"FRNN available: {FRNN_AVAILABLE}")
 
 if torch.cuda.is_available():
     device = "cuda"
@@ -225,7 +228,7 @@ def graph_intersection(
 
 
 def build_edges(
-    query, database, indices=None, r_max=1.0, k_max=10, return_indices=False
+    query, database, indices=None, r_max=1.0, k_max=10, return_indices=False, remove_self_loops=True
 ):
 
     dists, idxs, nn, grid = frnn.frnn_grid_points(
@@ -252,7 +255,8 @@ def build_edges(
         edge_list[0] = indices[edge_list[0]]
 
     # Remove self-loops
-    edge_list = edge_list[:, edge_list[0] != edge_list[1]]
+    if remove_self_loops:
+        edge_list = edge_list[:, edge_list[0] != edge_list[1]]
 
     if return_indices:
         return edge_list, dists, idxs, ind
@@ -260,15 +264,15 @@ def build_edges(
         return edge_list
 
 
-def build_knn(spatial, k):
+def build_knn(query, database, k):
 
     if device == "cuda":
         res = faiss.StandardGpuResources()
-        _, I = faiss.knn_gpu(res, spatial, spatial, k_max)
+        _, I = faiss.knn_gpu(res=res, xq=query, xb=database, k=k)
     elif device == "cpu":
-        index = faiss.IndexFlatL2(spatial.shape[1])
-        index.add(spatial)
-        _, I = index.search(spatial, k_max)
+        index = faiss.IndexFlatL2(database.shape[1])
+        index.add(query)
+        _, I = index.search(query, k)
 
     ind = torch.Tensor.repeat(
         torch.arange(I.shape[0], device=device), (I.shape[1], 1), 1
