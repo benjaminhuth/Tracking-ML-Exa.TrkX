@@ -259,7 +259,7 @@ class FilterBuilder(Callback):
     def save_downstream(self, batch, pl_module, datatype):
 
         with open(
-            os.path.join(self.output_dir, datatype, batch.event_file[-4:]), "wb"
+            os.path.join(self.output_dir, datatype, os.path.basename(batch.event_file)), "wb"
         ) as pickle_file:
             torch.save(batch, pickle_file)
 

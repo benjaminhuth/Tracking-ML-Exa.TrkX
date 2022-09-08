@@ -43,19 +43,19 @@ class EmbeddingBase(LightningModule):
 
     def train_dataloader(self):
         if len(self.trainset) > 0:
-            return DataLoader(self.trainset, batch_size=1, num_workers=16)
+            return DataLoader(self.trainset, batch_size=1, num_workers=0)
         else:
             return None
 
     def val_dataloader(self):
         if len(self.valset) > 0:
-            return DataLoader(self.valset, batch_size=1, num_workers=16)
+            return DataLoader(self.valset, batch_size=1, num_workers=0)
         else:
             return None
 
     def test_dataloader(self):
         if len(self.testset):
-            return DataLoader(self.testset, batch_size=1, num_workers=16)
+            return DataLoader(self.testset, batch_size=1, num_workers=0)
         else:
             return None
 
@@ -308,7 +308,7 @@ class EmbeddingBase(LightningModule):
                     "eff": eff,
                     "pur": pur,
                     #"current_lr": current_lr
-                }
+                },
                 on_epoch=True,
                 on_step=False
             )
