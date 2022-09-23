@@ -3,9 +3,6 @@ import numpy as np
 import pandas as pd
 import logging
 
-import trackml.dataset
-
-
 #####################################################
 #                   UTILD PANDAS                    #
 #####################################################
@@ -20,20 +17,20 @@ def select_max(test_val, current_val):
         return max(test_val, current_val)
 
 
-def find_ch0_min(cells_in, nb_hits):
+def find_channel0_min(cells_in, nb_hits):
     cell_idx = cells_in.index.values.reshape(-1, 1)
-    cells = cells_in[["hit_id", "ch0"]].values
-    where_min = find_ch0_property(cells, nb_hits, select_min, 10**8)
+    cells = cells_in[["hit_id", "channel0"]].values
+    where_min = find_channel0_property(cells, nb_hits, select_min, 10**8)
     return where_min
 
 
-def find_ch0_max(cells_in, nb_hits):
-    cells = cells_in[["hit_id", "ch0"]].values
-    where_max = find_ch0_property(cells, nb_hits, select_max, -(10**8))
+def find_channel0_max(cells_in, nb_hits):
+    cells = cells_in[["hit_id", "channel0"]].values
+    where_max = find_channel0_property(cells, nb_hits, select_max, -(10**8))
     return where_max
 
 
-def find_ch0_property(cells, nb_hits, comparator, init_val):
+def find_channel0_property(cells, nb_hits, comparator, init_val):
     nb_cells = cells.shape[0]
     cells = sort_cells_by_hit_id(cells)
 
@@ -78,8 +75,8 @@ def sort_cells_by_hit_id(cells):
 
 
 def local_angle(cell, module):
-    n_u = max(cell["ch0"]) - min(cell["ch0"]) + 1
-    n_v = max(cell["ch1"]) - min(cell["ch1"]) + 1
+    n_u = max(cell["channel0"]) - min(cell["channel0"]) + 1
+    n_v = max(cell["channel1"]) - min(cell["channel1"]) + 1
     l_u = n_u * module.pitch_u.values  # x
     l_v = n_v * module.pitch_v.values  # y
     l_w = 2 * module.module_t.values  # z
@@ -109,8 +106,8 @@ def theta_to_eta(theta):
 
 
 def get_all_local_angles(hits, cells, detector):
-    direction_count_u = cells.groupby(["hit_id"]).ch0.agg(["min", "max"])
-    direction_count_v = cells.groupby(["hit_id"]).ch1.agg(["min", "max"])
+    direction_count_u = cells.groupby(["hit_id"]).channel0.agg(["min", "max"])
+    direction_count_v = cells.groupby(["hit_id"]).channel1.agg(["min", "max"])
     nb_u = direction_count_u["max"] - direction_count_u["min"] + 1
     nb_v = direction_count_v["max"] - direction_count_v["min"] + 1
 
@@ -225,15 +222,19 @@ def get_cell_stats(cells):
 
 def get_one_event(event_path, detector_orig, detector_proc):
 
-    logging.info("Loading trackml")
-    hits, cells = trackml.dataset.load_event(event_path, parts=["hits", "cells"])
+    # TODO update when necessary
+    #logging.info("Loading ODD data")
+    
+    #hits, _ = load_hits_and_truth_as_trackml(event_path, detector_orig, mask_simhits=True)
+    #cells = pd.read_csv(event_path + "-cells.csv")
 
     logging.info("Hits and cells retrieved")
 
-    try:
+    if True:
+    #try:
         angles = augment_hit_features(hits, cells, detector_orig, detector_proc)
-    except Exception as e:
-        print(e)
-        raise Exception("Error augmenting hits.")
+    #except Exception as e:
+    #    print(e)
+    #    raise Exception("Error augmenting hits.")
 
     return angles
