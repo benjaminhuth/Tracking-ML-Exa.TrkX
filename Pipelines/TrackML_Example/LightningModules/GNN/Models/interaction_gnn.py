@@ -17,16 +17,6 @@ from torch.utils.checkpoint import checkpoint
 from ..gnn_base import GNNBase
 from ..utils import make_mlp
 
-@torch.jit.script
-def aggregate(e, end, x):
-    return torch.cat(
-        [
-            scatter_max(e, end, dim=0, dim_size=x.shape[0])[0],
-            scatter_add(e, end, dim=0, dim_size=x.shape[0]),
-        ],
-        dim=-1,
-    )
-
 
 class InteractionGNN(GNNBase):
 
@@ -88,8 +78,6 @@ class InteractionGNN(GNNBase):
             output_activation=None,
             hidden_activation=hparams["hidden_activation"],
         )
-        
-        self.checkpoint = checkpoint
 
     def reset_parameters(self):
 
@@ -97,7 +85,7 @@ class InteractionGNN(GNNBase):
             if type(layer) is Linear:
                 eval(self.hparams["initialization"])(layer.weight)
                 layer.bias.data.fill_(0)
-    
+
     def message_step(self, x, start, end, e):
 
         # Compute new node features
@@ -108,8 +96,13 @@ class InteractionGNN(GNNBase):
             edge_messages = scatter_max(e, end, dim=0, dim_size=x.shape[0])[0]
 
         elif self.hparams["aggregation"] == "sum_max":
-            edge_messages = aggregate(e, end, x)
-
+            edge_messages = torch.cat(
+                [
+                    scatter_max(e, end, dim=0, dim_size=x.shape[0])[0],
+                    scatter_add(e, end, dim=0, dim_size=x.shape[0]),
+                ],
+                dim=-1,
+            )
         node_inputs = torch.cat([x, edge_messages], dim=-1)
 
         x_out = self.node_network(node_inputs)
@@ -138,14 +131,14 @@ class InteractionGNN(GNNBase):
 
         # Encode the graph features into the hidden space
         x.requires_grad = True
-        x = self.checkpoint(self.node_encoder, x)
-        e = self.checkpoint(self.edge_encoder, torch.cat([x[start], x[end]], dim=1))
+        x = checkpoint(self.node_encoder, x)
+        e = checkpoint(self.edge_encoder, torch.cat([x[start], x[end]], dim=1))
 
         #         edge_outputs = []
         # Loop over iterations of edge and node networks
         for i in range(self.hparams["n_graph_iters"]):
 
-            x, e = self.checkpoint(self.message_step, x, start, end, e)
+            x, e = checkpoint(self.message_step, x, start, end, e)
 
         # Compute final edge scores; use original edge directions only
-        return self.checkpoint(self.output_step, x, start, end, e)
+        return checkpoint(self.output_step, x, start, end, e)
