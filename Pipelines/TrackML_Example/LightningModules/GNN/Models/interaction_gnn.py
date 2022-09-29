@@ -130,7 +130,8 @@ class InteractionGNN(GNNBase):
         end = edge_index[1,:]
 
         # Encode the graph features into the hidden space
-        x.requires_grad = True
+        if self.training:
+            x.requires_grad = True
         x = checkpoint(self.node_encoder, x)
         e = checkpoint(self.edge_encoder, torch.cat([x[start], x[end]], dim=1))
 

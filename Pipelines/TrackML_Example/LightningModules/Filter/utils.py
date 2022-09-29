@@ -6,7 +6,7 @@ import torch
 import scipy as sp
 import numpy as np
 
-from alive_progress import alive_bar
+from tqdm import tqdm
 from torch_geometric.data import Dataset
 
 
@@ -18,19 +18,16 @@ def load_dataset(input_dir, num, pt_background_cut, pt_signal_cut, true_edges, n
         all_events = os.listdir(input_dir)
         all_events = sorted([os.path.join(input_dir, event) for event in all_events])
         loaded_events = []
-        
-        disable_bar = not ("ALIVE_BAR" in os.environ and bool(os.environ["ALIVE_BAR"]))
-        with alive_bar(num, disable=disable_bar, title="Loading {}".format(os.path.split(input_dir)[1])) as bar:
-            for event in all_events[:num]:
-                try:
-                    loaded_event = torch.load(event, map_location=torch.device("cpu"))
-                    loaded_events.append(loaded_event)
-                    logging.info("Loaded event: {}".format(loaded_event.event_file))
-                except:
-                    logging.info("Corrupted event file: {}".format(event))
-                bar()
+
+        for event in tqdm(all_events[:num], desc="load"):
+            try:
+                loaded_event = torch.load(event, map_location=torch.device("cpu"))
+                loaded_events.append(loaded_event)
+                logging.info("Loaded event: {}".format(loaded_event.event_file))
+            except:
+                logging.info("Corrupted event file: {}".format(event))
         loaded_events = select_data(
-            loaded_events, pt_background_cut, pt_signal_cut, true_edges, noise, disable_bar
+            loaded_events, pt_background_cut, pt_signal_cut, true_edges, noise
         )
         return loaded_events
     else:
@@ -46,42 +43,40 @@ def get_edge_subset(edges, mask_where, inverse_mask):
     return included_edges, included_edges_mask
 
 
-def select_data(events, pt_background_cut, pt_signal_cut, true_edges, noise, disable_progress_bar=True):
+def select_data(events, pt_background_cut, pt_signal_cut, true_edges, noise):
     # Handle event in batched form
     if type(events) is not list:
         events = [events]
 
     # NOTE: Cutting background by pT BY DEFINITION removes noise
-    with alive_bar(len(events), disable=disable_progress_bar, title="Processing") as bar:
-        if (pt_background_cut > 0) or not noise:
-            for event in events:                
-                pt_mask = (event.pt > pt_background_cut) & (event.pid == event.pid)
-                pt_where = torch.where(pt_mask)[0]
+    if (pt_background_cut > 0) or not noise:
+        for event in tqdm(events, desc="select"):                
+            pt_mask = (event.pt > pt_background_cut) & (event.pid == event.pid)
+            pt_where = torch.where(pt_mask)[0]
 
-                inverse_mask = torch.zeros(pt_where.max() + 1).long()
-                inverse_mask[pt_where] = torch.arange(len(pt_where))
+            inverse_mask = torch.zeros(pt_where.max() + 1).long()
+            inverse_mask[pt_where] = torch.arange(len(pt_where))
 
-                edge_mask = None
-                event[true_edges], edge_mask = get_edge_subset(
-                    event[true_edges], pt_where, inverse_mask
-                )
+            edge_mask = None
+            event[true_edges], edge_mask = get_edge_subset(
+                event[true_edges], pt_where, inverse_mask
+            )
 
-                if "weights" in event.__dict__.keys():
-                    if event.weights.shape[0] == event[true_edges].shape[1]:
-                        event.weights = event.weights[edge_mask]
+            if "weights" in event.__dict__.keys():
+                if event.weights.shape[0] == event[true_edges].shape[1]:
+                    event.weights = event.weights[edge_mask]
 
-                event.edge_index, _ = get_edge_subset(
-                    event.edge_index, pt_where, inverse_mask
-                )
+            event.edge_index, _ = get_edge_subset(
+                event.edge_index, pt_where, inverse_mask
+            )
 
-                node_features = ["cell_data", "x", "hid", "pid", "pt", "layers"]
-                for feature in node_features:
-                    if feature in event.__dict__.keys():
-                        event[feature] = event[feature][pt_mask]
-                        
-                
-                logging.info("Processed event: {}".format(event.event_file))
-                bar()
+            node_features = ["cell_data", "x", "hid", "pid", "pt", "layers"]
+            for feature in node_features:
+                if feature in event.__dict__.keys():
+                    event[feature] = event[feature][pt_mask]
+                    
+            
+            logging.info("Processed event: {}".format(event.event_file))
 
     # Define the signal edges
     for event in events:

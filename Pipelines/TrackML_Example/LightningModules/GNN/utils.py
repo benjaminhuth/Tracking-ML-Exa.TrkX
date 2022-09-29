@@ -6,11 +6,7 @@ import pandas as pd
 import numpy as np
 import cupy as cp
 
-from alive_progress import alive_bar
-
-def alive_bar_disabled():
-    return not ("ALIVE_BAR" in os.environ and bool(os.environ["ALIVE_BAR"]))
-
+from tqdm import tqdm
 
 # ---------------------------- Dataset Processing -------------------------
 
@@ -21,10 +17,8 @@ def load_dataset(input_dir, num, pt_background_cut, pt_signal_cut, noise):
         all_events = sorted([os.path.join(input_dir, event) for event in all_events])
         loaded_events = []
 
-        with alive_bar(num, disable=alive_bar_disabled(), title="Loading") as bar:
-            for event in all_events[:num]:
-                loaded_events.append(torch.load(event, map_location=torch.device("cpu")))
-                bar()
+        for event in tqdm(all_events[:num], desc="load"):
+            loaded_events.append(torch.load(event, map_location=torch.device("cpu")))
 
         loaded_events = select_data(
             loaded_events, pt_background_cut, pt_signal_cut, noise
@@ -43,23 +37,20 @@ def select_data(events, pt_background_cut, pt_signal_cut, noise):
 
     # NOTE: Cutting background by pT BY DEFINITION removes noise
     if (pt_background_cut > 0) | (pt_signal_cut > 0):
-        with alive_bar(num, disable=alive_bar_disabled(), title="Processing") as bar:
-            for event in events:
-                edge_mask = (event.pt[event.edge_index] > pt_background_cut).all(0)
-                event.edge_index = event.edge_index[:, edge_mask]
-                event.y = event.y[edge_mask]
+        for event in tqdm(events, desc="select"):
+            edge_mask = (event.pt[event.edge_index] > pt_background_cut).all(0)
+            event.edge_index = event.edge_index[:, edge_mask]
+            event.y = event.y[edge_mask]
 
-                if "weights" in event.__dict__.keys():
-                    if event.weights.shape[0] == edge_mask.shape[0]:
-                        event.weights = event.weights[edge_mask]
+            if "weights" in event.__dict__.keys():
+                if event.weights.shape[0] == edge_mask.shape[0]:
+                    event.weights = event.weights[edge_mask]
 
-                if (pt_signal_cut > pt_background_cut) and (
-                    "signal_true_edges" in event.__dict__.keys()
-                ):
-                    signal_mask = (event.pt[event.signal_true_edges] > pt_signal_cut).all(0)
-                    event.signal_true_edges = event.signal_true_edges[:, signal_mask]
-
-                bar()
+            if (pt_signal_cut > pt_background_cut) and (
+                "signal_true_edges" in event.__dict__.keys()
+            ):
+                signal_mask = (event.pt[event.signal_true_edges] > pt_signal_cut).all(0)
+                event.signal_true_edges = event.signal_true_edges[:, signal_mask]
 
     return events
 
