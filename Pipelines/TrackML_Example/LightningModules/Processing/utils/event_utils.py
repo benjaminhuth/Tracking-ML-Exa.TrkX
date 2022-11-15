@@ -44,8 +44,8 @@ def local_to_global(measurements, detector):
     for i, meas in enumerate(measurements.itertuples()):
         trans, rot = geoid_to_transform[meas.geometry_id]
 
-        x = np.array([-meas.local0, -meas.local1, 0.0])
-        global_pos[i] = trans + x @ rot
+        x = np.array([meas.local0, meas.local1, 0.0])
+        global_pos[i] = trans + (x @ rot.T)
 
     return global_pos
 
@@ -171,13 +171,13 @@ def select_hits(hits, truth, particles, endcaps=False, noise=False):
 def build_event(
     event_file,
     feature_scale,
-    endcaps=False,
-    modulewise=True,
-    layerwise=True,
-    noise=False,
-    detector=None,
-    cell_information=False,
-    truth_hits=True,
+    modulewise,
+    layerwise,
+    noise,
+    detector,
+    cell_information,
+    truth_hits,
+    exclude_volumes,
 ):
     # Import basic information
     particles = pd.read_csv(event_file + "-particles.csv")
@@ -190,7 +190,7 @@ def build_event(
     if truth_hits:
         logging.info("Using truth hit information")
         hits = truth
-        hits["hit_id"] = np.array(hits.index)+1
+        hits["hit_id"] = np.array(hits.index)+1 # TODO is this +1 necessary?
         hits = hits.drop("index", 1)
     else:     
         logging.info("Using measurement information")
@@ -219,14 +219,38 @@ def build_event(
         particles[["particle_id", "vx", "vy", "vz", "pt"]], on="particle_id"
     )
     hits["weight"] = np.ones(len(hits.index)) / len(hits.index)
+
+    # Remove volumes if necessary
+    if len(exclude_volumes) > 0:
+        hits = hits[ ~hits["volume_id"].isin(exclude_volumes) ]
+
+    # Check correctness
+    # if not truth_hits:
+    #     vol_names = {
+    #         16: "pixel-endcaps",
+    #         17: "pixel-barrel",
+    #         18: "pixel-endcaps",
+    #         23: "sstrip-endcaps",
+    #         24: "sstrip-barrel",
+    #         25: "sstrip-endcaps",
+    #         28: "lstrip-endcaps",
+    #         29: "lstrip-barrel",
+    #         30: "lstrip-endcaps",
+    #     }
+    #
+    #     for _, meas_hit in hits.iterrows():
+    #         meas_pos = meas_hit[["x","y","z"]].to_numpy()
+    #         true_hit = truth.loc[meas_hit["hit_id"]]
+    #         assert meas_hit.geometry_id == true_hit.geometry_id
+    #         true_pos = true_hit[["x","y","z"]].to_numpy()
+    #         diff = np.linalg.norm(meas_pos - true_pos)
+    #         print(meas_pos, true_pos, diff, vol_names[meas_hit.volume_id])
+
     
     # Make a unique module ID and attach to hits
-    if detector is not None:
-        module_lookup = detector.reset_index()[["index", "volume_id", "layer_id", "module_id"]].rename(columns={"index": "module_index"})
-        hits = hits.merge(module_lookup, on=["volume_id", "layer_id", "module_id"], how="left")
-        module_id = hits.module_index.to_numpy()
-    else:
-        module_id = None
+    module_lookup = detector.reset_index()[["index", "volume_id", "layer_id", "module_id"]].rename(columns={"index": "module_index"})
+    hits = hits.merge(module_lookup, on=["volume_id", "layer_id", "module_id"], how="left")
+    module_id = hits.module_index.to_numpy()
 
     # Seems not to be needed right now
     try:
@@ -293,9 +317,9 @@ def prepare_event(
     detector_orig,
     detector_proc,
     cell_features,
+    exclude_volumes=[],
     progressbar=None,
     output_dir=None,
-    endcaps=False,
     modulewise=True,
     layerwise=True,
     noise=False,
@@ -326,13 +350,13 @@ def prepare_event(
             ) = build_event(
                 event_file,
                 feature_scale,
-                endcaps=endcaps,
                 modulewise=modulewise,
                 layerwise=layerwise,
                 noise=noise,
                 detector=detector_orig,
                 cell_information=cell_information,
-                truth_hits=truth_hits
+                truth_hits=truth_hits,
+                exclude_volumes=exclude_volumes,
             )
 
             data = Data(
